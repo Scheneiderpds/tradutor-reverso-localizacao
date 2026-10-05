@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "AEGEA - Ponte Tradutor Reverso -> Mapa de Cadastros",
+  "version": "1.0.0",
+  "description": "Envia o pino exato do Tradutor Reverso direto para o Mapa de Cadastros (ArcGIS).",
+  "permissions": [
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content_bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

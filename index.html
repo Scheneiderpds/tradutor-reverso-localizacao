@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGEA | Tradutor Reverso de Localização</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+<!-- Leaflet (Mapa para confirmação visual) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- JSZip para gerar o pacote do Plugin Chrome/Edge em 1 clique -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+  :root {
+    --brand-blue: #0b1f3f; 
+    --primary: #0f172a;
+    --accent: #2563eb;
+    --bg-page: #f4f7f9;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --success: #10b981;
+    --warning: #f59e0b;
+  }
+  
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+  body { background-color: var(--bg-page); color: var(--text); display: flex; flex-direction: column; height: 100vh; position: relative; overflow: hidden; }
+  
+  /* OVERLAY PARA ARRASTAR E SOLTAR (DRAG & DROP) */
+  #drop-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 31, 63, 0.85); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: white; border: 8px dashed var(--accent); }
+  #drop-overlay i { font-size: 5rem; color: var(--accent); margin-bottom: 20px; animation: bounce 1s infinite; }
+  #drop-overlay h1 { font-size: 2.5rem; font-weight: 700; text-align: center; }
+  @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+  /* CABEÇALHO */
+  .corp-header { background-color: var(--brand-blue); color: #ffffff; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 1000; flex-shrink: 0; }
+  .header-left { display: flex; align-items: center; }
+  .corp-header .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: 1px; margin-right: 16px; }
+  .corp-header .divider { width: 1px; height: 20px; background-color: rgba(255,255,255,0.3); margin-right: 16px; }
+  .corp-header .title { font-size: 1.1rem; font-weight: 500; color: #e2e8f0; }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .status-plugin { font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; background: rgba(255,255,255,0.1); color: #cbd5e1; display: flex; align-items: center; gap: 6px; }
+  .status-plugin.ativo { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
+  .btn-baixar-plugin { background: #f59e0b; color: #0f172a; border: none; padding: 8px 14px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: 0.2s; }
+  .btn-baixar-plugin:hover { background: #fbbf24; transform: translateY(-1px); }
+
+  /* CONTAINER PRINCIPAL */
+  .container { display: flex; flex: 1; padding: 24px 30px; gap: 24px; max-width: 1450px; margin: 0 auto; width: 100%; overflow: hidden; }
+  
+  /* PAINEL ESQUERDO */
+  .panel-left { flex: 1; display: flex; flex-direction: column; gap: 18px; max-width: 520px; overflow-y: auto; padding-right: 6px; }
+  
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); flex-shrink: 0; }
+  .card h2 { font-size: 1.05rem; color: var(--brand-blue); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card h2 .title-left { display: flex; align-items: center; gap: 8px; }
+  
+  /* INPUT AREA */
+  .input-group { display: flex; flex-direction: column; gap: 10px; }
+  .input-label { font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+  .badge-dica { background: #e0f2fe; color: #0369a1; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; }
+  
+  .input-field { padding: 12px 14px; font-size: 0.92rem; border: 2px solid var(--border); border-radius: 8px; outline: none; transition: 0.2s; background: #f8fafc; resize: vertical; min-height: 54px; max-height: 140px; line-height: 1.4; }
+  .input-field:focus { border-color: var(--accent); background: #fff; }
+  
+  .btn-row { display: flex; gap: 8px; }
+  .btn-traduzir { flex: 1; background: var(--accent); color: white; border: none; padding: 13px; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+  .btn-traduzir:hover { background: #1d4ed8; transform: translateY(-1px); }
+  .btn-limpar { background: #f1f5f9; color: #475569; border: 1px solid var(--border); padding: 0 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: 0.2s; }
+  .btn-limpar:hover { background: #e2e8f0; color: var(--primary); }
+
+  /* AVISO DE CORREÇÃO AUTOMÁTICA */
+  .correcao-banner { display: none; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: 8px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; margin-bottom: 10px; align-items: center; gap: 8px; }
+
+  /* BARRA DE MÚLTIPLAS RUAS HOMÔNIMAS OU ESQUINAS */
+  .opcoes-homonimas { display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; flex-direction: column; gap: 8px; }
+  .opcoes-homonimas-titulo { font-size: 0.74rem; font-weight: 700; color: #1e40af; display: flex; align-items: center; gap: 6px; }
+  .opcoes-botoes { display: flex; flex-wrap: wrap; gap: 6px; }
+  .btn-opcao-local { background: #ffffff; color: #1e3a8a; border: 1px solid #93c5fd; border-radius: 6px; padding: 6px 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: 0.15s; display: flex; align-items: center; gap: 5px; }
+  .btn-opcao-local:hover { background: #dbeafe; }
+  .btn-opcao-local.ativo { background: #ef4444; color: #ffffff; border-color: #dc2626; box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25); }
+
+  /* ÁREA DE RESULTADO */
+  .result-area { display: none; flex-direction: column; gap: 10px; }
+  .result-item { background: #f8fafc; border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+  .result-item.destaque-cadastro { background: #eff6ff; border-color: #bfdbfe; }
+  .result-label { font-size: 0.7rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; display: block; }
+  .result-value { font-size: 0.98rem; color: var(--primary); font-weight: 700; word-break: break-word; }
+  
+  .btn-copiar { background: #fff; color: var(--accent); border: 1px solid var(--accent); padding: 6px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: 0.2s; flex-shrink: 0; margin-left: 10px; }
+  .btn-copiar:hover { background: var(--accent); color: #fff; }
+
+  /* BOTÃO: CRAVAR PINO NO MAPA DE CADASTROS VIA PLUGIN */
+  .btn-cravar-cadastro { background: linear-gradient(135deg, #0b1f3f, #1e3a8a); color: #ffffff; border: 1px solid #1d4ed8; padding: 13px 16px; border-radius: 8px; font-size: 0.92rem; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; justify-content: center; align-items: center; gap: 10px; width: 100%; box-shadow: 0 4px 10px rgba(11, 31, 63, 0.2); margin-top: 2px; }
+  .btn-cravar-cadastro:hover { background: linear-gradient(135deg, #1e3a8a, #2563eb); transform: translateY(-1px); }
+  
+  .btn-google { background: #f8fafc; color: #ea4335; border: 1px solid #e2e8f0; padding: 10px; border-radius: 8px; font-size: 0.88rem; font-weight: 600; cursor: pointer; transition: 0.2s; text-align: center; text-decoration: none; display: flex; justify-content: center; align-items: center; gap: 8px; }
+  .btn-google:hover { background: #fef2f2; border-color: #fecaca; }
+
+  /* CARTÃO INFERIOR: DADOS DA SOLICITAÇÃO WHATSAPP */
+  .os-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .os-info-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; cursor: pointer; transition: 0.15s; position: relative; }
+  .os-info-box:hover { border-color: var(--accent); background: #eff6ff; }
+  .os-info-box.full-width { grid-column: span 2; }
+  .os-info-box .os-lbl { font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase; display: flex; justify-content: space-between; margin-bottom: 2px; }
+  .os-info-box .os-val { font-size: 0.85rem; font-weight: 700; color: var(--primary); word-break: break-word; }
+  .os-info-box .copy-hint { font-size: 0.65rem; color: var(--accent); opacity: 0; transition: 0.15s; }
+  .os-info-box:hover .copy-hint { opacity: 1; }
+  .badge-prioridade { background: #fee2e2; color: #dc2626; padding: 1px 6px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+
+  /* TOAST DE SUCESSO */
+  #toast { position: fixed; top: 80px; right: 30px; background: var(--success); color: white; padding: 12px 24px; border-radius: 8px; font-weight: 600; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); transform: translateX(150%); transition: 0.3s ease-out; z-index: 9999; }
+  #toast.show { transform: translateX(0); }
+
+  /* PAINEL DIREITO (MAPA) */
+  .panel-right { flex: 1.5; background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; position: relative; box-shadow: 0 4px 6px rgba(0,0,0,0.02); }
+  #map { width: 100%; height: 100%; z-index: 1; }
+  
+  .map-overlay-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #94a3b8; font-size: 1.1rem; font-weight: 600; z-index: 0; text-align: center; padding: 20px; }
+  .map-dica-arraste { position: absolute; bottom: 12px; left: 12px; z-index: 500; background: rgba(15, 23, 42, 0.82); color: #fff; padding: 6px 12px; border-radius: 6px; font-size: 0.74rem; font-weight: 600; pointer-events: none; display: none; }
+
+  /* MODAL DE INSTRUÇÕES DO PLUGIN */
+  .modal-bg { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.65); z-index: 10000; justify-content: center; align-items: center; padding: 20px; }
+  .modal-box { background: #fff; border-radius: 12px; max-width: 560px; width: 100%; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 14px; }
+  .modal-box h3 { color: var(--brand-blue); font-size: 1.15rem; display: flex; justify-content: space-between; align-items: center; }
+  .modal-steps { font-size: 0.86rem; color: #334155; line-height: 1.6; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; }
+  .modal-steps code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-weight: 700; color: var(--brand-blue); }
+
+  .loader { display: none; width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s ease-in-out infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- TELA DE DRAG & DROP INVISÍVEL -->
+<div id="drop-overlay">
+  <i class="fas fa-map-marked-alt"></i>
+  <h1>Solte a Localização ou Texto Aqui!</h1>
+  <p style="font-size: 1.2rem; margin-top: 10px; opacity: 0.8;">O sistema vai rastrear automaticamente.</p>
+</div>
+
+<!-- MODAL PARA BAIXAR E ATIVAR O PLUGIN CHROME / EDGE -->
+<div class="modal-bg" id="modal-plugin">
+  <div class="modal-box">
+    <h3>
+      <span>🧩 Plugin de Ponte: Tradutor ➔ Mapa de Cadastros</span>
+      <span style="cursor:pointer; color:#64748b;" onclick="fecharModalPlugin()">✕</span>
+    </h3>
+    <p style="font-size:0.84rem; color:#475569;">
+      Este plugin faz a ponte entre este painel HTML e a aba do seu <b>Mapa de Cadastros</b> no Chrome ou no Edge:
+    </p>
+    <ol class="modal-steps">
+      <li>Clique no botão amarelo abaixo para baixar o pacote <b><code>plugin-aegea-cadastro.zip</code></b> e extraia (descompacte) ele em uma pasta no seu computador.</li>
+      <li>No seu navegador, digite na barra de endereços <code>chrome://extensions</code> (no Chrome) ou <code>edge://extensions</code> (no Edge) e aperte Enter.</li>
+      <li>Ative a chavinha <b>"Modo do desenvolvedor"</b> (no canto da tela).</li>
+      <li>Clique no botão <b>"Carregar sem compactação"</b> (ou <i>Load unpacked</i>) e selecione a pasta que você extraiu.</li>
+      <li><b>Importante:</b> Se você abrir este painel HTML direto de um arquivo salvo no PC, clique em "Detalhes" do plugin lá nas extensões e marque a chavinha <b>"Permitir acesso a URLs de arquivo"</b>.</li>
+    </ol>
+    <div style="display:flex; gap:10px; margin-top:6px;">
+      <button class="btn-baixar-plugin" style="flex:1; justify-content:center; padding:12px; font-size:0.9rem;" onclick="gerarEBaixarZipDoPlugin()">
+        <i class="fas fa-download"></i> Baixar Arquivos do Plugin (.ZIP)
+      </button>
+      <button class="btn-limpar" style="padding:12px 18px;" onclick="fecharModalPlugin()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="corp-header">
+  <div class="header-left">
+    <div class="logo">AEGEA</div>
+    <div class="divider"></div>
+    <div class="title">Tradutor Reverso - Busca Rápida de OS por Localização ou Mensagem</div>
+  </div>
+  <div class="header-right">
+    <div class="status-plugin" id="badge-status-plugin" title="Indica se a extensão do navegador está conectada a esta página">
+      <i class="fas fa-plug"></i> <span id="texto-status-plugin">Plugin: Não detectado</span>
+    </div>
+    <button class="btn-baixar-plugin" onclick="abrirModalPlugin()">
+      <i class="fas fa-puzzle-piece"></i> Instalar Plugin (Chrome/Edge)
+    </button>
+  </div>
+</div>
+
+<div class="container">
+  
+  <!-- LADO ESQUERDO: CONTROLES, ENDEREÇO E DADOS DA OS -->
+  <div class="panel-left">
+    <div class="card">
+      <h2>
+        <span class="title-left"><i class="fas fa-search-location"></i> Entrada de Dados</span>
+      </h2>
+      <div class="input-group">
+        <span class="input-label">
+          Coordenadas, Link ou Texto do WhatsApp
+          <span class="badge-dica">Ctrl+V direto na tela</span>
+        </span>
+        <textarea id="input-loc" class="input-field" placeholder="Cole aqui a mensagem inteira do WhatsApp, o endereço digitado, link do Maps ou coordenadas..." onkeydown="handleEnter(event)"></textarea>
+        <div class="btn-row">
+          <button class="btn-traduzir" onclick="traduzirLocalBaseadoNoInput()">
+            <span id="btn-text"><i class="fas fa-bolt"></i> Traduzir e Localizar</span>
+            <div class="loader" id="loader"></div>
+          </button>
+          <button class="btn-limpar" onclick="limparTudo()" title="Limpar campos"><i class="fas fa-trash-alt"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARTÃO 1: ENDEREÇO CORRIGIDO E IDENTIFICADO -->
+    <div class="card" id="card-resultado" style="display: none;">
+      <h2>
+        <span class="title-left"><i class="fas fa-map-signs"></i> Endereço Oficial Identificado</span>
+      </h2>
+
+      <div class="correcao-banner" id="correcao-banner">
+        <i class="fas fa-magic"></i>
+        <span id="correcao-texto">Endereço corrigido automaticamente!</span>
+      </div>
+
+      <!-- SELETOR AUTOMÁTICO QUANDO O BAIRRO TEM MAIS DE UMA RUA OU ESQUINA -->
+      <div class="opcoes-homonimas" id="opcoes-homonimas">
+        <div class="opcoes-homonimas-titulo">
+          <i class="fas fa-map-pin"></i>
+          <span id="opcoes-homonimas-label">Opções encontradas nesta região. Clique para alternar:</span>
+        </div>
+        <div class="opcoes-botoes" id="opcoes-botoes"></div>
+      </div>
+
+      <div class="result-area" id="result-area">
+        
+        <!-- BOTÃO DE DISPARO DIRETO PARA O MAPA DE CADASTROS VIA PLUGIN -->
+        <button class="btn-cravar-cadastro" onclick="dispararPinoParaMapaDeCadastros()">
+          <i class="fas fa-crosshairs" style="color:#f59e0b; font-size:1.1rem;"></i>
+          <span>Cravar Pino no Mapa de Cadastros</span>
+        </button>
+
+        <div class="result-item destaque-cadastro">
+          <div>
+            <span class="result-label" style="color:var(--accent);">Busca p/ Mapa de Cadastros (Rua + Nº)</span>
+            <span class="result-value" id="res-rua">Aguardando...</span>
+          </div>
+          <button class="btn-copiar" onclick="copiarTexto('res-rua')"><i class="fas fa-copy"></i> Copiar</button>
+        </div>
+
+        <div class="result-item">
+          <div>
+            <span class="result-label">CEP (Crucial para Sistemas)</span>
+            <span class="result-value" id="res-cep" style="color:var(--accent);">Aguardando...</span>
+          </div>
+          <button class="btn-copiar" onclick="copiarTexto('res-cep')"><i class="fas fa-copy"></i> Copiar</button>
+        </div>
+
+        <div class="result-item">
+          <div>
+            <span class="result-label">Bairro</span>
+            <span class="result-value" id="res-bairro">Aguardando...</span>
+          </div>
+          <button class="btn-copiar" onclick="copiarTexto('res-bairro')"><i class="fas fa-copy"></i> Copiar</button>
+        </div>
+
+        <div class="result-item">
+          <div>
+            <span class="result-label">Município / Estado</span>
+            <span class="result-value" id="res-cidade">Aguardando...</span>
+          </div>
+          <button class="btn-copiar" onclick="copiarTexto('res-cidade')"><i class="fas fa-copy"></i> Copiar</button>
+        </div>
+
+        <div class="result-item">
+          <div>
+            <span class="result-label">Coordenada Exata (Lat, Lng)</span>
+            <span class="result-value" id="res-coords" style="font-size:0.88rem; color:#475569;">Aguardando...</span>
+          </div>
+          <button class="btn-copiar" onclick="copiarTexto('res-coords')"><i class="fas fa-copy"></i> Copiar</button>
+        </div>
+
+        <button class="btn-copiar" style="margin-top: 2px; width: 100%; padding: 11px; background: var(--bg-page); border-color: var(--border); color: var(--primary); margin-left: 0;" onclick="copiarTextoCompleto()">
+          <i class="fas fa-clone"></i> Copiar Endereço Completo (Rua, Bairro, Cidade e CEP)
+        </button>
+
+        <a href="#" id="link-google" target="_blank" class="btn-google">
+          <i class="fas fa-external-link-alt"></i> Conferir no Google Maps
+        </a>
+
+      </div>
+    </div>
+
+    <!-- CARTÃO 2: INFORMAÇÕES DA SOLICITAÇÃO (WHATSAPP) PARA GERAR A OS -->
+    <div class="card" id="card-os-info" style="display: none;">
+      <h2>
+        <span class="title-left"><i class="fas fa-clipboard-list"></i> Dados do Pedido (WhatsApp)</span>
+        <span style="font-size:0.7rem; color:#64748b; font-weight:600;">Clique em um item para copiar</span>
+      </h2>
+      <div class="os-info-grid" id="os-info-grid"></div>
+    </div>
+
+  </div>
+
+  <!-- LADO DIREITO: MAPA VISUAL -->
+  <div class="panel-right">
+    <div class="map-overlay-text" id="map-placeholder">
+      <i class="fas fa-map-marked-alt" style="font-size:2.5rem; margin-bottom:10px; display:block; color:#cbd5e1;"></i>
+      O mapa carregará o local exato pesquisado aqui.
+    </div>
+    <div class="map-dica-arraste" id="map-dica-arraste">
+      💡 Dica: Você pode arrastar o pino vermelho ou clicar em outro pino azul para ajustar o local exato!
+    </div>
+    <div id="map"></div>
+  </div>
+
+</div>
+
+<div id="toast">Copiado para a área de transferência!</div>
+
+<script>
+  let map = null;
+  let markersGroup = null;
+  let candidatosAtuais = [];
+  let indiceCandidatoAtivo = 0;
+  let pluginDetectado = false;
+
+  // Lista oficial de Municípios do RJ para separar automaticamente quando vier colado no Bairro (ex: "PRATA BELFORD ROXO")
+  const MUNICIPIOS_RJ = [
+    'Belford Roxo', 'São João de Meriti', 'Duque de Caxias', 'Nova Iguaçu', 'Mesquita',
+    'Nilópolis', 'Queimados', 'Japeri', 'São Gonçalo', 'Itaboraí', 'Niterói', 'Maricá',
+    'Magé', 'Guapimirim', 'Tanguá', 'Rio Bonito', 'Cachoeiras de Macacu', 'Seropédica',
+    'Itaguaí', 'Paracambi', 'Paquetá', 'Rio de Janeiro'
+  ];
+
+  // Dicionário para converter "Rua 2" <-> "Rua Dois" automaticamente
+  const NUM_PARA_EXTENSO = {
+    '1': 'Um', '2': 'Dois', '3': 'Três', '4': 'Quatro', '5': 'Cinco',
+    '6': 'Seis', '7': 'Sete', '8': 'Oito', '9': 'Nove', '10': 'Dez',
+    '11': 'Onze', '12': 'Doze', '13': 'Treze', '14': 'Quatorze', '15': 'Quinze',
+    '16': 'Dezesseis', '17': 'Dezessete', '18': 'Dezoito', '19': 'Dezenove', '20': 'Vinte',
+    '21': 'Vinte e Um', '22': 'Vinte e Dois', '23': 'Vinte e Três', '24': 'Vinte e Quatro', '25': 'Vinte e Cinco',
+    '30': 'Trinta', '40': 'Quarenta', '50': 'Cinquenta', '60': 'Sessenta'
+  };
+
+  /* ==========================================
+     COMUNICAÇÃO COM O PLUGIN CHROME / EDGE
+  ========================================== */
+  window.addEventListener('message', (event) => {
+    if (!event.data) return;
+    if (event.data.type === 'AEGEA_PLUGIN_PONG') {
+      pluginDetectado = true;
+      const badge = document.getElementById('badge-status-plugin');
+      const txt = document.getElementById('texto-status-plugin');
+      if (badge && txt) {
+        badge.classList.add('ativo');
+        txt.innerText = 'Plugin Ativo';
+      }
+    }
+    if (event.data.type === 'AEGEA_PLUGIN_RESPOSTA') {
+      if (event.data.ok) {
+        mostrarToast('🎯 Pino enviado para a aba do Mapa de Cadastros!');
+      } else {
+        alert(event.data.erro || 'Abra a aba do Mapa de Cadastros primeiro para o plugin jogar o pino lá!');
+      }
+    }
+  });
+
+  setTimeout(() => {
+    window.postMessage({ type: 'AEGEA_PLUGIN_PING' }, '*');
+  }, 400);
+
+  function dispararPinoParaMapaDeCadastros() {
+    const c = candidatosAtuais[indiceCandidatoAtivo];
+    if (!c) return;
+
+    const payload = {
+      rua: c.rua,
+      cep: c.cep,
+      bairro: c.bairro,
+      cidade: c.cidade.replace(' - RJ', '').trim(),
+      lat: c.lat,
+      lng: c.lng
+    };
+
+    navigator.clipboard.writeText(`${payload.rua}, ${payload.cidade}`).catch(() => {});
+
+    if (pluginDetectado || document.documentElement.getAttribute('data-aegea-plugin') === '1') {
+      window.postMessage({ type: 'AEGEA_ENVIAR_PINO_CADASTRO', payload: payload }, '*');
+    } else {
+      abrirModalPlugin();
+      mostrarToast('Endereço copiado! Instale o plugin para pular direto para o Mapa de Cadastros.');
+    }
+  }
+
+  function abrirModalPlugin() {
+    document.getElementById('modal-plugin').style.display = 'flex';
+  }
+
+  function fecharModalPlugin() {
+    document.getElementById('modal-plugin').style.display = 'none';
+  }
+
+  /* ==========================================
+     MÓDULO DE ARRASTAR E SOLTAR E CTRL+V
+  ========================================== */
+  document.addEventListener('paste', (e) => {
+    if (document.activeElement.id !== 'input-loc') {
+      const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+      if (pastedText) {
+        document.getElementById('input-loc').value = pastedText;
+        traduzirLocalBaseadoNoInput();
+      }
+    } else {
+      setTimeout(() => traduzirLocalBaseadoNoInput(), 80);
+    }
+  });
+
+  const dropOverlay = document.getElementById('drop-overlay');
+  
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropOverlay.style.display = 'flex';
+  });
+
+  document.addEventListener('dragleave', (e) => {
+    if (e.target === dropOverlay) {
+      dropOverlay.style.display = 'none';
+    }
+  });
+
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropOverlay.style.display = 'none';
+    
+    let draggedData = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+    try { draggedData = decodeURIComponent(draggedData); } catch (err) {}
+    
+    if (draggedData) {
+      document.getElementById('input-loc').value = draggedData;
+      traduzirLocalBaseadoNoInput();
+    }
+  });
+
+  function handleEnter(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      traduzirLocalBaseadoNoInput();
+    }
+  }
+
+  function limparTudo() {
+    document.getElementById('input-loc').value = '';
+    document.getElementById('card-resultado').style.display = 'none';
+    document.getElementById('card-os-info').style.display = 'none';
+    document.getElementById('correcao-banner').style.display = 'none';
+    document.getElementById('opcoes-homonimas').style.display = 'none';
+  }
+
+  function distanciaMetros(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function normTexto(s) {
+    return String(s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  }
+
+  // Detecta se o nome do Município veio colado dentro da linha do Bairro (ex: "PRATA   BELFORD ROXO")
+  function separarCidadeEmbutidaNoTexto(textoBairro, cidadeAtual) {
+    let bairroLimpo = String(textoBairro || '').trim();
+    let cidadeDetectada = String(cidadeAtual || '').trim();
+
+    const normB = normTexto(bairroLimpo);
+    for (const mun of MUNICIPIOS_RJ) {
+      const normMun = normTexto(mun);
+      // Cria regex tolerante a acentos para achar o município dentro da string do bairro
+      const palavrasMun = normMun.split(/\s+/);
+      const padraoRegex = new RegExp(`\\b${palavrasMun.join('\\s+')}\\b`, 'i');
+
+      if (normB.includes(normMun)) {
+        if (!cidadeDetectada) cidadeDetectada = mun;
+        // Remove o nome do município de dentro do campo bairro caso haja outra palavra antes (ex: "PRATA BELFORD ROXO" -> "PRATA")
+        const semMun = bairroLimpo
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(padraoRegex, '')
+          .replace(/[-,/]+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (semMun.length >= 2) {
+          bairroLimpo = semMun;
+        }
+        break;
+      }
+    }
+
+    return { bairro: bairroLimpo, cidade: cidadeDetectada };
+  }
+
+  /* ==========================================
+     EXTRATOR DE COORDENADAS E DE WHATSAPP (INTELIGENTE)
+  ========================================== */
+  function extrairCoordenadas(texto) {
+    const regex1 = /(-?\d{1,3}\.\d{4,})[^\d-]+(-?\d{1,3}\.\d{4,})/;
+    const match1 = texto.match(regex1);
+    if (match1) return { lat: parseFloat(match1[1]), lng: parseFloat(match1[2]) };
+    
+    const regex2 = /(?:q|query|ll)=(-?\d{1,3}\.\d{4,}),(-?\d{1,3}\.\d{4,})/;
+    const match2 = texto.match(regex2);
+    if (match2) return { lat: parseFloat(match2[1]), lng: parseFloat(match2[2]) };
+    
+    const regex3 = /@(-?\d{1,3}\.\d{4,}),(-?\d{1,3}\.\d{4,})/;
+    const match3 = texto.match(regex3);
+    if (match3) return { lat: parseFloat(match3[1]), lng: parseFloat(match3[2]) };
+
+    return null;
+  }
+
+  function analisarTextoWhatsApp(texto) {
+    const linhas = texto.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    let dados = {
+      equipeTopo: '',
+      solicitante: '',
+      prioridade: '',
+      codServico: '',
+      tipoServico: '',
+      hd: '',
+      motivo: '',
+      demandante: '',
+      matricula: '',
+      enderecoBruto: '',
+      bairro: '',
+      cidade: '',
+      pavimento: '',
+      observacao: '',
+      ehMensagemEstruturada: false
+    };
+
+    let linhasNaoReconhecidas = [];
+    let aguardandoEnderecoNaProximaLinha = false;
+
+    linhas.forEach((linha, idx) => {
+      const limpa = linha.replace(/\*+/g, ' ').replace(/^[\s\-–—•:]+/, '').replace(/\s+/g, ' ').trim();
+      if (!limpa) return;
+
+      if (aguardandoEnderecoNaProximaLinha) {
+        aguardandoEnderecoNaProximaLinha = false;
+        if (!/^(?:BAIRRO|CIDADE|MUNIC|PAVIMENTO|OBS|SOLICITA|PRIORIDADE|MOTIVO|MATR)/i.test(limpa)) {
+          dados.enderecoBruto = limpa;
+          return;
+        }
+      }
+
+      if (idx === 0 && (linha.startsWith('~') || /[A-Z]{3,}-\d{2,}/i.test(limpa))) {
+        dados.equipeTopo = limpa.replace(/^~\s*/, '');
+        return;
+      }
+
+      const extrairValor = (regex) => {
+        const m = limpa.match(regex);
+        return m && m[1] ? m[1].trim() : '';
+      };
+
+      if (/^EQUIPE\b/i.test(limpa)) {
+        const eq = extrairValor(/^EQUIPE\s*:?\s*(.*)/i);
+        if (eq) dados.equipeTopo = dados.equipeTopo ? `${dados.equipeTopo} (${eq})` : eq;
+        dados.ehMensagemEstruturada = true;
+      }
+      else if (/^SOLICITA(?:NTE|[CÇ][AÃ]O)\b/i.test(limpa)) { dados.solicitante = extrairValor(/^SOLICITA(?:NTE|[CÇ][AÃ]O)\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^PRIORIDADE\b/i.test(limpa)) { dados.prioridade = extrairValor(/^PRIORIDADE\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^C[OÓ]D\.?\s*(?:DO\s*)?SERVI[CÇ]O\b/i.test(limpa)) { dados.codServico = extrairValor(/^C[OÓ]D\.?\s*(?:DO\s*)?SERVI[CÇ]O\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^(?:TIPO\s*DE\s*)?SERVI[CÇ]O\b/i.test(limpa)) { dados.tipoServico = extrairValor(/^(?:TIPO\s*DE\s*)?SERVI[CÇ]O\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^HD\b/i.test(limpa)) { dados.hd = extrairValor(/^HD\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^MATR[IÍ]CULA\b/i.test(limpa)) { dados.matricula = extrairValor(/^MATR[IÍ]CULA\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^MOTIVO\b/i.test(limpa)) { dados.motivo = extrairValor(/^MOTIVO\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^DEMANDANTE\b/i.test(limpa)) { dados.demandante = extrairValor(/^DEMANDANTE\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^(?:ENDERE[CÇ]O|END\.?|LOGRADOURO|LOCAL(?:IZA[CÇ][AÃ]O)?)\b/i.test(limpa)) {
+        const valEnd = extrairValor(/^(?:ENDERE[CÇ]O|END\.?|LOGRADOURO|LOCAL(?:IZA[CÇ][AÃ]O)?)\s*:?\s*(.*)/i);
+        dados.ehMensagemEstruturada = true;
+        if (valEnd) {
+          dados.enderecoBruto = valEnd;
+        } else {
+          aguardandoEnderecoNaProximaLinha = true;
+        }
+      }
+      else if (/^BAIRRO\b/i.test(limpa)) { dados.bairro = extrairValor(/^BAIRRO\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^(?:CIDADE|MUNIC[IÍ]PIO)\b/i.test(limpa)) { dados.cidade = extrairValor(/^(?:CIDADE|MUNIC[IÍ]PIO)\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^(?:TIPO\s*DE\s*)?PAVIMENTO\b/i.test(limpa)) { dados.pavimento = extrairValor(/^(?:TIPO\s*DE\s*)?PAVIMENTO\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else if (/^OBS(?:ERVA[CÇ][AÃ]O)?\b/i.test(limpa)) { dados.observacao = extrairValor(/^OBS(?:ERVA[CÇ][AÃ]O)?\s*:?\s*(.*)/i); dados.ehMensagemEstruturada = true; }
+      else {
+        linhasNaoReconhecidas.push(limpa);
+      }
+    });
+
+    // Se a equipe colocou o município junto com o bairro (ex: "Bairro: PRATA BELFORD ROXO"), separa automaticamente!
+    if (dados.bairro) {
+      const sep = separarCidadeEmbutidaNoTexto(dados.bairro, dados.cidade);
+      dados.bairro = sep.bairro;
+      dados.cidade = sep.cidade;
+    }
+
+    // Se ainda não tiver cidade, verifica se o município está escrito dentro do Endereço ou em alguma linha solta
+    if (!dados.cidade && dados.enderecoBruto) {
+      const sepEnd = separarCidadeEmbutidaNoTexto(dados.enderecoBruto, '');
+      if (sepEnd.cidade) dados.cidade = sepEnd.cidade;
+    }
+
+    if (!dados.enderecoBruto && linhasNaoReconhecidas.length > 0) {
+      const linhaComCaraDeRua = linhasNaoReconhecidas.find(l =>
+        /\b(?:rua|r\.|av\.?|avn|avenida|travessa|tv\.?|etr|estrada|est\.?|alameda|pra[cç]a|beco|rodovia|viela|lote|qd|quadra|n[º°o]?\s*\d+|\d+)\b/i.test(l)
+      );
+      dados.enderecoBruto = linhaComCaraDeRua || linhasNaoReconhecidas[0];
+    }
+
+    if (!dados.enderecoBruto && (dados.bairro || dados.cidade)) {
+      dados.enderecoBruto = dados.bairro || dados.cidade;
+    }
+
+    if (!dados.ehMensagemEstruturada && !dados.enderecoBruto) {
+      dados.enderecoBruto = texto.replace(/\r?\n/g, ', ').trim();
+    }
+
+    return dados;
+  }
+
+  function exibirCardDadosSolicitacao(dados) {
+    const card = document.getElementById('card-os-info');
+    const grid = document.getElementById('os-info-grid');
+
+    if (!dados.ehMensagemEstruturada) {
+      card.style.display = 'none';
+      return;
+    }
+
+    const campos = [
+      { label: 'Equipe / Remetente', val: dados.equipeTopo },
+      { label: 'Prioridade', val: dados.prioridade, isPrioridade: true },
+      { label: 'Cód. do Serviço', val: dados.codServico },
+      { label: 'Tipo de Serviço', val: dados.tipoServico },
+      { label: 'Motivo', val: dados.motivo },
+      { label: 'Pavimento', val: dados.pavimento },
+      { label: 'Solicitante', val: dados.solicitante },
+      { label: 'Demandante', val: dados.demandante },
+      { label: 'Matrícula Informada', val: dados.matricula },
+      { label: 'HD Informado', val: dados.hd },
+      { label: 'Endereço Escrito pela Equipe', val: `${dados.enderecoBruto} - ${dados.bairro} (${dados.cidade || 'RJ'})`, full: true },
+      { label: 'Observação', val: dados.observacao, full: true }
+    ];
+
+    let html = '';
+    campos.forEach(c => {
+      if (!c.val) return;
+      const safeVal = c.val.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const displayVal = c.isPrioridade && /sim|urgente|alta/i.test(c.val)
+        ? `<span class="badge-prioridade">${c.val}</span>`
+        : c.val;
+
+      html += `
+        <div class="os-info-box ${c.full ? 'full-width' : ''}" onclick="copiarParaClipboard('${safeVal}')">
+          <div class="os-lbl">
+            <span>${c.label}</span>
+            <span class="copy-hint"><i class="fas fa-copy"></i> Copiar</span>
+          </div>
+          <div class="os-val">${displayVal}</div>
+        </div>
+      `;
+    });
+
+    grid.innerHTML = html;
+    card.style.display = 'block';
+  }
+
+  /* ==========================================
+     TRADUTOR DE SIGLAS, ESQUINAS E VARIAÇÕES DE RUA
+  ========================================== */
+  function expandirSiglasLogradouro(texto) {
+    return String(texto || '')
+      .replace(/\*+/g, ' ')
+      .replace(/\b(?:etr|estr|est\.?)\b/gi, 'Estrada')
+      .replace(/\b(?:avn|avd|av\.?)\b/gi, 'Avenida')
+      .replace(/\b(?:r\.?)\b/gi, 'Rua')
+      .replace(/\b(?:trv|tv\.?|trav\.?)\b/gi, 'Travessa')
+      .replace(/\b(?:pca|pc\.?|prc)\b/gi, 'Praça')
+      .replace(/\b(?:rod\.?|rdv)\b/gi, 'Rodovia')
+      .replace(/\b(?:alm|al\.?)\b/gi, 'Alameda')
+      .replace(/\b(?:vl\.?)\b/gi, 'Viela')
+      .replace(/\b(?:s\/n[º°o]?|sn)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Separa quando a equipe informa uma ESQUINA (ex: "ETR PLINIO CASADO ESQ. AVN DOS CONFRADES")
+  function extrairRuasPrincipaisEEsquina(enderecoBruto) {
+    const expandido = expandirSiglasLogradouro(enderecoBruto);
+
+    // Verifica se tem marcador de esquina ("ESQ.", "ESQUINA COM", "ESQUINA", "C/", "CRUZAMENTO")
+    const regexEsquina = /\b(?:esq\.?(?:\s*com|\s*c\/)?|esquina(?:\s*com|\s*c\/)?|cruzamento(?:\s*com|\s*c\/)?|\bc\/)\s+/i;
+    if (regexEsquina.test(expandido)) {
+      const partes = expandido.split(regexEsquina).map(p => p.trim()).filter(Boolean);
+      if (partes.length >= 2) {
+        return {
+          ehEsquina: true,
+          rua1: separarRuaENumero(partes[0]),
+          rua2: separarRuaENumero(partes[1])
+        };
+      }
+    }
+
+    return {
+      ehEsquina: false,
+      rua1: separarRuaENumero(expandido),
+      rua2: null
+    };
+  }
+
+  function separarRuaENumero(enderecoTexto) {
+    let limpo = expandirSiglasLogradouro(enderecoTexto)
+      .replace(/\b(?:n[º°o]?|num(?:ero)?|nº)\s*(\d+)\b/gi, ', $1')
+      .replace(/\b(?:qd|quadra|lt|lote|casa|apt|bloco|prox(?:imo)?|em frente)\b.*/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    let rua = limpo;
+    let numero = '';
+
+    const matchVirgula = limpo.match(/^(.+?)\s*,\s*(\d+[A-Za-z]?)\b/);
+    const matchEspaco = limpo.match(/^(.+?)\s+(\d+[A-Za-z]?)$/);
+
+    if (matchVirgula) {
+      rua = matchVirgula[1].trim();
+      numero = matchVirgula[2].trim();
+    } else if (matchEspaco) {
+      const possivelRua = matchEspaco[1].trim();
+      if (!/^(?:rua|r\.?|av\.?|avenida|travessa|tv\.?|estrada|est\.?)$/i.test(possivelRua)) {
+        rua = possivelRua;
+        numero = matchEspaco[2].trim();
+      }
+    }
+
+    return { rua, numero };
+  }
+
+  function gerarVariacoesDeRua(rua) {
+    let variacoes = [];
+    const adicionar = (v) => {
+      const limpo = String(v || '').replace(/\s+/g, ' ').trim();
+      if (limpo && !variacoes.includes(limpo)) variacoes.push(limpo);
+    };
+
+    const ruaExpandida = expandirSiglasLogradouro(rua);
+    adicionar(ruaExpandida);
+
+    // Variação de Número <-> Extenso ("Rua 2" <-> "Rua Dois")
+    const matchNum = ruaExpandida.match(/^((?:rua|avenida|travessa|estrada|alameda)\s+)0*(\d+)\b(.*)$/i);
+    if (matchNum && NUM_PARA_EXTENSO[matchNum[2]]) {
+      variacoes.unshift(`${matchNum[1]}${NUM_PARA_EXTENSO[matchNum[2]]}${matchNum[3] || ''}`);
+    }
+
+    Object.entries(NUM_PARA_EXTENSO).forEach(([digito, extenso]) => {
+      const regexExt = new RegExp(`^((?:rua|avenida|travessa|estrada)\\s+)${extenso}\\b(.*)$`, 'i');
+      const mExt = ruaExpandida.match(regexExt);
+      if (mExt) adicionar(`${mExt[1]}${digito}${mExt[2] || ''}`);
+    });
+
+    // Variação inteligente de Tipo de Logradouro (muitas vezes a equipe chama "Rua dos Confrades" de "Avenida dos Confrades" ou "Avenida Plínio Casado" de "Estrada Plínio Casado")
+    const nomeNucleo = ruaExpandida.replace(/^(?:rua|avenida|estrada|travessa|alameda|rodovia|praça)\s+/i, '').trim();
+    if (nomeNucleo && nomeNucleo !== ruaExpandida) {
+      adicionar(nomeNucleo);
+      adicionar(`Rua ${nomeNucleo}`);
+      adicionar(`Avenida ${nomeNucleo}`);
+      adicionar(`Estrada ${nomeNucleo}`);
+    }
+
+    return variacoes.slice(0, 6);
+  }
+
+  function extrairPalavrasChaveRua(nomeRua) {
+    const ignorar = new Set(['rua', 'r', 'avenida', 'av', 'avn', 'travessa', 'tv', 'estrada', 'est', 'etr', 'alameda', 'al', 'praca', 'pc', 'beco', 'viela', 'rodovia', 'de', 'da', 'do', 'das', 'dos', 'e', 'doutor', 'dr', 'presidente', 'pres', 'governador', 'gov']);
+    return normTexto(nomeRua)
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(p => p.length >= 2 && !ignorar.has(p) && !/^\d+$/.test(p));
+  }
+
+  function pontuarSemelhancaNomeRua(ruaPedida, ruaEncontrada) {
+    const palavrasPedidas = extrairPalavrasChaveRua(ruaPedida);
+    if (palavrasPedidas.length === 0) return 0;
+
+    const normEncontrada = normTexto(ruaEncontrada);
+    let acertos = 0;
+    palavrasPedidas.forEach(p => {
+      if (normEncontrada.includes(p)) acertos++;
+    });
+
+    const proporcao = acertos / palavrasPedidas.length;
+    let bonus = proporcao === 1 ? 75 : (proporcao >= 0.5 ? 15 : -50);
+
+    const pediuRua = /\b(?:rua|r\.?)\b/i.test(ruaPedida);
+    const achouTravessa = /\b(?:travessa|tv\.?|beco)\b/i.test(ruaEncontrada);
+    if (pediuRua && achouTravessa && proporcao < 1) bonus -= 30;
+
+    return bonus;
+  }
+
+  /* ==========================================
+     FLUXO PRINCIPAL DE TRADUÇÃO
+  ========================================== */
+  function traduzirLocalBaseadoNoInput() {
+    const input = document.getElementById('input-loc').value.trim();
+    if (!input) return;
+
+    const dadosWA = analisarTextoWhatsApp(input);
+    exibirCardDadosSolicitacao(dadosWA);
+
+    // 1. Coordenadas diretas (Lat, Lng)
+    const coords = extrairCoordenadas(input);
+    if (coords) {
+      document.getElementById('correcao-banner').style.display = 'none';
+      document.getElementById('opcoes-homonimas').style.display = 'none';
+      iniciarTraducaoESRI(coords.lat, coords.lng, true);
+      return;
+    }
+
+    // 2. Link encurtado
+    if (input.includes('maps.app.goo.gl') || input.includes('goo.gl')) {
+      alert("Parece ser um link encurtado do Google. Abra o link no navegador, copie as coordenadas ou o link completo e cole aqui.");
+      return;
+    }
+
+    // 3. Busca inteligente por Endereço
+    if (dadosWA.enderecoBruto) {
+      buscarEnderecoPorTextoInteligente(dadosWA);
+    } else {
+      alert("Não foi possível identificar coordenadas nem um endereço válido no texto colado.");
+    }
+  }
+
+  // Busca candidatos de uma rua específica no Esri + OpenStreetMap
+  async function consultarRuaNosMotores(ruaObj, bairro, cidade, rotuloExtra = '') {
+    const { rua, numero } = ruaObj;
+    const variacoesRua = gerarVariacoesDeRua(rua);
+    let resultados = [];
+
+    // 1. Consulta Esri ArcGIS
+    for (const varRua of variacoesRua.slice(0, 3)) {
+      const queryEsri = `${varRua}${numero ? ', ' + numero : ''}, ${bairro ? bairro + ', ' : ''}${cidade}, Rio de Janeiro, BRA`;
+      const urlEsri = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(queryEsri)}&countryCode=BRA&searchExtent=-44.9,-23.4,-40.9,-20.7&outFields=Match_addr,Addr_type,StAddr,AddNum,StName,Nbrhd,District,City,Region,Postal&maxLocations=10&f=json`;
+
+      try {
+        const resp = await fetch(urlEsri);
+        const data = await resp.json();
+        if (data && Array.isArray(data.candidates)) {
+          data.candidates.forEach(c => {
+            const att = c.attributes || {};
+            if (!['PointAddress', 'StreetAddress', 'StreetName', 'Subaddress', 'StreetInt'].includes(att.Addr_type)) return;
+            if (cidade && att.City && !normTexto(att.City).includes(normTexto(cidade)) && !normTexto(cidade).includes(normTexto(att.City))) return;
+
+            const nomeRuaCand = att.StName || att.StAddr || varRua;
+            const bonusNome = pontuarSemelhancaNomeRua(rua, nomeRuaCand);
+            const temNumeroExato = Boolean(numero && att.AddNum && String(att.AddNum) === String(numero));
+            const bateBairro = Boolean(bairro && (normTexto(att.Nbrhd).includes(normTexto(bairro)) || normTexto(att.District).includes(normTexto(bairro)) || normTexto(att.Match_addr).includes(normTexto(bairro))));
+
+            let score = (c.score || 80) + bonusNome;
+            if (temNumeroExato) score += 25;
+            if (bateBairro) score += 18;
+
+            let ruaExibicao = att.StAddr || (att.StName ? `${att.StName}${numero ? ', ' + numero : ''}` : varRua);
+            if (numero && !ruaExibicao.includes(numero)) ruaExibicao = `${ruaExibicao}, ${numero}`;
+            if (rotuloExtra && !ruaExibicao.includes(rotuloExtra)) ruaExibicao = `${ruaExibicao} (${rotuloExtra})`;
+
+            resultados.push({
+              rua: ruaExibicao,
+              cep: att.Postal || '',
+              bairro: att.Nbrhd || att.District || bairro || 'Bairro não identificado',
+              cidade: `${att.City || cidade} - RJ`,
+              lat: c.location.y,
+              lng: c.location.x,
+              score: score,
+              bateBairro: bateBairro,
+              nomeExato: bonusNome >= 70,
+              fonte: 'Esri'
+            });
+          });
+        }
+      } catch (e) {}
+    }
+
+    // 2. Consulta OpenStreetMap (Nominatim)
+    for (const varRua of variacoesRua) {
+      const qStreet = numero ? `${varRua}, ${numero}` : varRua;
+      const urlNom = `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(qStreet)}&city=${encodeURIComponent(cidade)}&state=Rio%20de%20Janeiro&country=Brazil&addressdetails=1&format=json&limit=12`;
+
+      try {
+        const resp = await fetch(urlNom, { headers: { 'Accept-Language': 'pt-BR' } });
+        const lista = await resp.json();
+        if (Array.isArray(lista) && lista.length > 0) {
+          lista.forEach(item => {
+            const addr = item.address || {};
+            const txtCompleto = normTexto(item.display_name || '');
+            const normB = normTexto(bairro);
+            const bateBairro = normB ? txtCompleto.includes(normB) : true;
+
+            const ruaOficial = addr.road || addr.pedestrian || varRua;
+            const bonusNome = pontuarSemelhancaNomeRua(rua, ruaOficial);
+            const bairroOficial = addr.suburb || addr.neighbourhood || addr.quarter || bairro;
+            const cidadeOficial = addr.city || addr.town || addr.municipality || cidade;
+
+            let score = 85 + bonusNome + (bateBairro ? 20 : 0);
+            if (addr.house_number && String(addr.house_number) === String(numero)) score += 25;
+
+            let ruaExibicao = numero ? `${ruaOficial}, ${numero}` : ruaOficial;
+            if (rotuloExtra && !ruaExibicao.includes(rotuloExtra)) ruaExibicao = `${ruaExibicao} (${rotuloExtra})`;
+
+            resultados.push({
+              rua: ruaExibicao,
+              cep: addr.postcode || '',
+              bairro: bairroOficial,
+              cidade: `${cidadeOficial} - RJ`,
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon),
+              score: score,
+              bateBairro: bateBairro,
+              nomeExato: bonusNome >= 70,
+              fonte: 'OSM'
+            });
+          });
+          // Se já achou correspondência exata no bairro pelo OSM, não precisa testar todas as variações secundárias
+          if (resultados.some(r => r.nomeExato && r.bateBairro)) break;
+        }
+      } catch (e) {}
+    }
+
+    return resultados;
+  }
+
+  // MOTOR COMBINADO DE ALTA PRECISÃO (SUPORTA SIGLAS, ESQUINAS E BAIRRO+CIDADE JUNTOS)
+  async function buscarEnderecoPorTextoInteligente(dadosWA) {
+    document.getElementById('btn-text').style.display = 'none';
+    document.getElementById('loader').style.display = 'block';
+
+    try {
+      const bairro = dadosWA.bairro || '';
+      const cidade = dadosWA.cidade || 'Rio de Janeiro';
+      const infoRuas = extrairRuasPrincipaisEEsquina(dadosWA.enderecoBruto);
+
+      let listaCandidatosBruta = [];
+
+      if (infoRuas.ehEsquina && infoRuas.rua2) {
+        // 1. Tenta achar a interseção direta na Esri ("Rua A & Rua B")
+        const queryIntersecao = `${infoRuas.rua1.rua} & ${infoRuas.rua2.rua}, ${bairro ? bairro + ', ' : ''}${cidade}, Rio de Janeiro, BRA`;
+        const urlInt = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?SingleLine=${encodeURIComponent(queryIntersecao)}&countryCode=BRA&searchExtent=-44.9,-23.4,-40.9,-20.7&outFields=Match_addr,Addr_type,StAddr,Nbrhd,District,City,Postal&maxLocations=5&f=json`;
+        try {
+          const dInt = await (await fetch(urlInt)).json();
+          (dInt.candidates || []).forEach(c => {
+            const att = c.attributes || {};
+            if (att.Addr_type === 'StreetInt') {
+              listaCandidatosBruta.push({
+                rua: `${infoRuas.rua1.rua} esq. ${infoRuas.rua2.rua}`,
+                cep: att.Postal || '',
+                bairro: att.Nbrhd || att.District || bairro,
+                cidade: `${att.City || cidade} - RJ`,
+                lat: c.location.y,
+                lng: c.location.x,
+                score: 210,
+                bateBairro: true,
+                nomeExato: true,
+                fonte: 'Esri-Corner'
+              });
+            }
+          });
+        } catch (e) {}
+
+        // 2. Busca as duas ruas da esquina em paralelo para cravar os pontos no bairro certo
+        const [resRua1, resRua2] = await Promise.all([
+          consultarRuaNosMotores(infoRuas.rua1, bairro, cidade, `Esq. ${infoRuas.rua2.rua}`),
+          consultarRuaNosMotores(infoRuas.rua2, bairro, cidade, `Esq. ${infoRuas.rua1.rua}`)
+        ]);
+
+        // Se ambas as ruas foram encontradas, dá bônus máximo para o par que fica mais próximo entre si (a esquina real!)
+        if (resRua1.length > 0 && resRua2.length > 0) {
+          resRua1.forEach(r1 => {
+            resRua2.forEach(r2 => {
+              const dist = distanciaMetros(r1.lat, r1.lng, r2.lat, r2.lng);
+              if (dist < 1200) {
+                r1.score += 35;
+                r2.score += 40; // Prioriza a rua transversal mais específica do bairro
+              }
+            });
+          });
+        }
+
+        listaCandidatosBruta.push(...resRua2, ...resRua1);
+      } else {
+        // Busca normal de 1 rua
+        const resUnica = await consultarRuaNosMotores(infoRuas.rua1, bairro, cidade);
+        listaCandidatosBruta.push(...resUnica);
+      }
+
+      // Filtra resultados relevantes
+      const relevantes = listaCandidatosBruta.filter(c => c.nomeExato || c.bateBairro || normTexto(c.bairro).includes(normTexto(bairro)));
+      const baseFiltrada = relevantes.length > 0 ? relevantes : listaCandidatosBruta;
+
+      baseFiltrada.sort((a, b) => b.score - a.score);
+
+      let candidatosUnicos = [];
+      baseFiltrada.forEach(cand => {
+        const jaExistePerto = candidatosUnicos.some(u => distanciaMetros(u.lat, u.lng, cand.lat, cand.lng) < 160);
+        if (!jaExistePerto && candidatosUnicos.length < 4) {
+          candidatosUnicos.push(cand);
+        }
+      });
+
+      // Fallback Inteligente: Se ainda assim não achou a rua exata, busca de forma livre no Bairro + Município para nunca travar na tela!
+      if (candidatosUnicos.length === 0 && (bairro || cidade)) {
+        const buscaFallback = `${infoRuas.rua1.rua}, ${bairro}, ${cidade}, Rio de Janeiro, Brasil`;
+        const urlLivre = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(buscaFallback)}&format=json&addressdetails=1&limit=3`;
+        try {
+          const listaLivre = await (await fetch(urlLivre)).json();
+          if (Array.isArray(listaLivre) && listaLivre.length > 0) {
+            const it = listaLivre[0];
+            const ad = it.address || {};
+            candidatosUnicos.push({
+              rua: ad.road || infoRuas.rua1.rua,
+              cep: ad.postcode || '',
+              bairro: ad.suburb || ad.neighbourhood || bairro,
+              cidade: `${ad.city || ad.town || cidade} - RJ`,
+              lat: parseFloat(it.lat),
+              lng: parseFloat(it.lon),
+              score: 80
+            });
+          }
+        } catch (e) {}
+      }
+
+      for (let c of candidatosUnicos) {
+        if (!c.cep) {
+          try {
+            const rEsri = await (await fetch(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${c.lng},${c.lat}&f=json`)).json();
+            if (rEsri && rEsri.address && rEsri.address.Postal) {
+              c.cep = rEsri.address.Postal;
+            }
+          } catch (e) {}
+        }
+        if (!c.cep) c.cep = 'Consultar no Cadastro';
+      }
+
+      if (candidatosUnicos.length > 0) {
+        candidatosAtuais = candidatosUnicos;
+        indiceCandidatoAtivo = 0;
+
+        const banner = document.getElementById('correcao-banner');
+        const textoBanner = document.getElementById('correcao-texto');
+        banner.style.display = 'flex';
+        textoBanner.innerText = `Solicitado: "${dadosWA.enderecoBruto}" ➔ Encontrado: "${candidatosAtuais[0].rua}"`;
+
+        renderizarBotoesOpcoesHomonimas();
+        selecionarCandidato(0, true);
+      } else {
+        alert("Não foi possível localizar essa rua nesse bairro/município. Verifique se o nome do bairro ou cidade estão corretos.");
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao consultar o serviço de localização.");
+    } finally {
+      document.getElementById('btn-text').style.display = 'block';
+      document.getElementById('loader').style.display = 'none';
+    }
+  }
+
+  function renderizarBotoesOpcoesHomonimas() {
+    const box = document.getElementById('opcoes-homonimas');
+    const containerBotoes = document.getElementById('opcoes-botoes');
+    const lbl = document.getElementById('opcoes-homonimas-label');
+
+    if (candidatosAtuais.length <= 1) {
+      box.style.display = 'none';
+      return;
+    }
+
+    lbl.innerText = `Foram encontrados ${candidatosAtuais.length} pontos possíveis na região! Clique para alternar:`;
+    let html = '';
+    candidatosAtuais.forEach((c, idx) => {
+      const cepCurto = c.cep && c.cep !== 'Consultar no Cadastro' ? ` (CEP ${c.cep})` : '';
+      html += `
+        <button class="btn-opcao-local ${idx === indiceCandidatoAtivo ? 'ativo' : ''}" onclick="selecionarCandidato(${idx}, false)">
+          📍 Local ${idx + 1}${cepCurto}
+        </button>
+      `;
+    });
+
+    containerBotoes.innerHTML = html;
+    box.style.display = 'flex';
+  }
+
+  function selecionarCandidato(idx, ajustarVisaoGeral) {
+    if (!candidatosAtuais[idx]) return;
+    indiceCandidatoAtivo = idx;
+    const c = candidatosAtuais[idx];
+
+    renderizarBotoesOpcoesHomonimas();
+    preencherPainelResultado(c.rua, c.cep, c.bairro, c.cidade, c.lat, c.lng);
+    desenharPinosNoMapa(ajustarVisaoGeral);
+  }
+
+  // MOTOR 2: ESRI REVERSE GEOCODING (QUANDO A EQUIPE MANDA COORDENADAS OU QUANDO ARRASTA O PINO)
+  async function iniciarTraducaoESRI(lat, lng, limparHomonimos = false) {
+    document.getElementById('btn-text').style.display = 'none';
+    document.getElementById('loader').style.display = 'block';
+
+    try {
+      const url = `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?location=${lng},${lat}&f=json`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data && data.address) {
+        const address = data.address;
+        let rua = address.Address || (address.Match_addr ? address.Match_addr.split(',')[0] : "Logradouro não identificado");
+        let cep = address.Postal || "CEP não disponível";
+        let bairro = address.Neighborhood || address.Subregion || 'Bairro não identificado';
+        let cidade = `${address.City || address.Region || 'Município não identificado'} - RJ`;
+
+        if (limparHomonimos) {
+          candidatosAtuais = [{ rua, cep, bairro, cidade, lat, lng }];
+          indiceCandidatoAtivo = 0;
+          document.getElementById('opcoes-homonimas').style.display = 'none';
+        } else if (candidatosAtuais[indiceCandidatoAtivo]) {
+          candidatosAtuais[indiceCandidatoAtivo] = { rua, cep, bairro, cidade, lat, lng };
+        }
+
+        preencherPainelResultado(rua, cep, bairro, cidade, lat, lng);
+        desenharPinosNoMapa(false);
+      } else {
+        alert("O satélite não encontrou um endereço mapeado nestas coordenadas exatas.");
+      }
+    } catch (error) {
+      alert("Erro de conexão com o satélite da Esri.");
+      console.error(error);
+    } finally {
+      document.getElementById('btn-text').style.display = 'block';
+      document.getElementById('loader').style.display = 'none';
+    }
+  }
+
+  function preencherPainelResultado(rua, cep, bairro, cidade, lat, lng) {
+    document.getElementById('card-resultado').style.display = 'block';
+    document.getElementById('result-area').style.display = 'flex';
+
+    const coordsFormatadas = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+
+    document.getElementById('res-rua').innerText = rua;
+    document.getElementById('res-cep').innerText = cep;
+    document.getElementById('res-bairro').innerText = bairro;
+    document.getElementById('res-cidade').innerText = cidade;
+    document.getElementById('res-coords').innerText = coordsFormatadas;
+
+    document.getElementById('link-google').href = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  }
+
+  function desenharPinosNoMapa(ajustarBoundsGeral) {
+    document.getElementById('map-placeholder').style.display = 'none';
+    document.getElementById('map-dica-arraste').style.display = 'block';
+
+    const candAtivo = candidatosAtuais[indiceCandidatoAtivo];
+    if (!candAtivo) return;
+
+    if (!map) {
+      map = L.map('map').setView([candAtivo.lat, candAtivo.lng], 17);
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri'
+      }).addTo(map);
+      markersGroup = L.featureGroup().addTo(map);
+    }
+
+    markersGroup.clearLayers();
+    let bounds = [];
+
+    candidatosAtuais.forEach((c, idx) => {
+      bounds.push([c.lat, c.lng]);
+      const ehAtivo = (idx === indiceCandidatoAtivo);
+
+      if (ehAtivo) {
+        const pinoHTML = `<div style="background-color:#ef4444; color:white; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:bold; border:3px solid white; box-shadow:0 4px 8px rgba(0,0,0,0.4);"><i class="fas fa-map-marker-alt"></i></div>`;
+        const customIcon = L.divIcon({ className: 'custom-pin-active', html: pinoHTML, iconSize: [32, 32], iconAnchor: [16, 16] });
+
+        const m = L.marker([c.lat, c.lng], { icon: customIcon, draggable: true, zIndexOffset: 1000 }).addTo(markersGroup);
+        m.bindPopup(`<b>Local Selecionado (Opção ${idx + 1})</b><br>${c.rua} - ${c.bairro}<br><small style="color:#64748b;">CEP: ${c.cep} | Arraste o pino para ajustar</small>`).openPopup();
+
+        m.on('dragend', function(ev) {
+          const pos = ev.target.getLatLng();
+          document.getElementById('correcao-banner').style.display = 'flex';
+          document.getElementById('correcao-texto').innerText = `Pino ajustado manualmente no mapa!`;
+          iniciarTraducaoESRI(pos.lat, pos.lng, false);
+        });
+      } else {
+        const pinoSecHTML = `<div style="background-color:#2563eb; color:white; width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; border:2px solid white; box-shadow:0 3px 6px rgba(0,0,0,0.3); cursor:pointer;" title="Clique para selecionar esta opção">${idx + 1}</div>`;
+        const secIcon = L.divIcon({ className: 'custom-pin-sec', html: pinoSecHTML, iconSize: [26, 26], iconAnchor: [13, 13] });
+
+        const mSec = L.marker([c.lat, c.lng], { icon: secIcon }).addTo(markersGroup);
+        mSec.on('click', () => selecionarCandidato(idx, false));
+      }
+    });
+
+    if (ajustarBoundsGeral && bounds.length > 1) {
+      map.fitBounds(bounds, { padding: [70, 70], maxZoom: 16 });
+    } else {
+      map.setView([candAtivo.lat, candAtivo.lng], 17);
+    }
+  }
+
+  /* ==========================================
+     BOTÕES DE COPIAR (CLIPBOARD)
+  ========================================== */
+  function copiarTexto(elementId) {
+    const texto = document.getElementById(elementId).innerText;
+    copiarParaClipboard(texto);
+  }
+
+  function copiarTextoCompleto() {
+    const rua = document.getElementById('res-rua').innerText;
+    const cep = document.getElementById('res-cep').innerText;
+    const bairro = document.getElementById('res-bairro').innerText;
+    const cidade = document.getElementById('res-cidade').innerText;
+    
+    const textoCompleto = `${rua}, ${bairro} - ${cidade} (CEP: ${cep})`;
+    copiarParaClipboard(textoCompleto);
+  }
+
+  function copiarParaClipboard(texto) {
+    navigator.clipboard.writeText(texto).then(() => {
+      mostrarToast();
+    }).catch(err => {
+      console.error('Erro ao copiar', err);
+    });
+  }
+
+  function mostrarToast(msgPersonalizada) {
+    const toast = document.getElementById('toast');
+    toast.innerText = msgPersonalizada || 'Copiado para a área de transferência!';
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2400);
+  }
+</script>
+</body>
+</html>
