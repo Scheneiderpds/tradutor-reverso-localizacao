@@ -1,6 +1,6 @@
 # 📍 Tradutor Reverso de Localização & Ponte para Mapa de Cadastros
 
-**Idealizador e Desenvolvedor Original:** Schneider Pereira dos Santos  
+**Idealizador e Desenvolvedor Original:** Scheneider Pereira dos Santos  
 **Status:** Funcional (Painel Web + Extensão Chrome/Edge Manifest V3)
 
 ---
